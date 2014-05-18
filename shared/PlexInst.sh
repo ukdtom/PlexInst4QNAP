@@ -11,7 +11,7 @@ DOWNLOADLINK='https://plex.tv/downloads'	# Download link @ vendor site
 # already installed version of Plex
 ######################################################################
 get_installed_version(){
-	MYVER=$(/sbin/getcfg $QPKG_NAME_STRING Version -d 0 -f $CONF)
+	MYVER=$(/sbin/getcfg $QPKG_NAME_STRING Version -d FALSE -f $CONF)
 	/sbin/log_tool -t 0 -a "Currently installed version of $TARGETAPP is $MYVER";
 #	MYVER='FORCEDOWN'		# Use when testing
 }
@@ -60,15 +60,13 @@ getVendorVerAndLink(){
 ######################################################################
 fetch_and_install(){
 	/sbin/log_tool -t 0 -a "About to download the file $myUrl"
-	# Remove the download file since it's no longer needed
-	rm -f -r $DIR/downloads
 	# Download the darn thingy
 	/sbin/curl -sk $myUrl -o $DIR/MY.qpkg
 	# Change rights, so we can execute it
 	chmod 755 $DIR/MY.qpkg
-	# Install the latest and greatest version of Plex
-	$DIR/MY.qpkg 
-	# Remove the Plex file since it's no longer needed
+	# Install the latest and greatest version of the QPKG
+	$DIR/MY.qpkg
+	# Remove the QPKG file since it's no longer needed
 	rm -f -r $DIR/MY.qpkg
 	# Lets inform our Master, but as a warning, so it pop's up in the admin interface
 	/sbin/log_tool -t 1 -a "All done....$TARGETAPP is now installed" 
@@ -95,21 +93,18 @@ case "$1" in
 	getVendorVerAndLink
 	if [[ -z $MYVER ]]
 	then
-		echo "$TARGETAPP is not installed....need to download and install";
 		download_and_install;
 	else
 		# Already installed, so check if we should upgrade
-
 		if [[ $myUrl != *$MYVER* ]]
 		then
 			/sbin/log_tool -t 0 -a "We need to upgrade $TARGETAPP";
-	echo "Upgrade"
 			upgrade;
 		else
-			/sbin/log_tool -t 0 -a "Already newest version";
-	echo "Already got it"		
+			/sbin/log_tool -t 0 -a "Already newest version";	
 		fi
 	fi
+	@/sbin/setcfg PlexInst Enable FALSE -f /etc/config/qpkg.conf
     ;;
 
   stop)
