@@ -9,15 +9,11 @@ DOWNLOADLINK='https://plex.tv/downloads'	# Download link @ vendor site
 ######################################################################
 # This will set the variable named MyVer with the version of an 
 # already installed version of Plex
-#
-# TODO: Replace hardcoded searchstring with $QPKG_NAME_STRING
 ######################################################################
 get_installed_version(){
-	MYVER=$(sed -n '1,/PlexMediaServer/d;/\[/,$d;/^$/d;p' $CONF|grep 'Version')
-	# Strip the first 10 caracters
-	MYVER=${MYVER:10}
-#	MYVER='1.2'		# Use when testing
-	/sbin/log_tool -t 0 -a "Currently installed version of $TARGETAPP is $MYVER";		
+	MYVER=$(/sbin/getcfg $QPKG_NAME_STRING Version -d 0 -f $CONF)
+	/sbin/log_tool -t 0 -a "Currently installed version of $TARGETAPP is $MYVER";
+#	MYVER='FORCEDOWN'		# Use when testing
 }
 
 ######################################################################
@@ -41,25 +37,22 @@ upgrade(){
 # TODO: This part is hardcoded to Plex
 ######################################################################
 getVendorVerAndLink(){
-	# Get the download page from Plex, and ignore the certificate
-	/sbin/curl -sk $DOWNLOADLINK -o $DIR/downloads
-	# Filter out all lines, that contains the word .qpkg, and save in the file named match
-	grep ".qpkg" $DIR/downloads > $DIR/match
-	# Remove <a href=" from start of all lines
-	sed 's/<a href="//' $DIR/match > $DIR/downloads
-	# Remove remaining part of the line for Intel builds
-	sed 's/" class="btn btn-left track-download">Intel<\/a>//' $DIR/downloads > $DIR/match
-	# Remove remaining part of the line for Arm builds
-	sed 's/" class="btn btn-right track-download">ARM<\/a>//' $DIR/match > $DIR/downloads
+	# Get the download page from Plex, and ignore the certificate, and filter out lines with qpkg
+	PAGE=$(/sbin/curl -sk $DOWNLOADLINK |grep '.qpkg')
+	# Strip start part of line
+	PAGE=$(sed 's/<a href="//g' <<< $PAGE)
+	# Strip end part of Intel line
+	PAGE=$(sed 's/" class="btn btn-left track-download">Intel<\/a>//' <<< $PAGE)
+	# Strip end part of ARM line
+	PAGE=$(sed 's/" class="btn btn-right track-download">ARM<\/a>//' <<< $PAGE)
+	ARMURL=${PAGE#*.qpkg}
+	INTELURL=${PAGE/$ARMURL/''}
 	# Find the relevant URL based on processor type
 	if [ $HOSTTYPE == 'i686' ]; then
-		myUrl=$(sed -n '1p' < $DIR/downloads)	# This is for Intel
+		myUrl=$INTELURL
 	else
-		myUrl=$(sed -n '2p' < $DIR/downloads)	# This is for other platforms, like Arm 
+		myUrl=$ARMURL
 	fi
-	# Remove files, since we dont need them anymore
-	rm -f -r $DIR/match
-	rm -f -r $DIR/downloads
 }
 
 ######################################################################
@@ -94,7 +87,7 @@ case "$1" in
 	fi
 	: ADD START ACTIONS HERE
 	# Get dir of this script
-	DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+	DIR=$(/sbin/getcfg $QPKG_NAME Install_Path -d FALSE -f $CONF)
 	/sbin/log_tool -t 0 -a "Starting $QPKG_NAME from $DIR"
 	# Check for version already installed
 	get_installed_version
